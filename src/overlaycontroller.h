@@ -22,6 +22,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QFileSystemWatcher>
 #include <memory>
 #include <easylogging++.h>
 
@@ -154,6 +155,9 @@ private:
     QJsonDocument m_remoteVersionJsonDocument = QJsonDocument();
     QJsonObject m_remoteVersionJsonObject;
 
+    QFileSystemWatcher* m_settingsFileWatcher = nullptr;
+    QTimer* m_settingsReloadTimer = nullptr;
+
 public: // I know it's an ugly hack to make them public to enable external
         // access, but I am too lazy to implement getters.
     SteamVRTabController m_steamVRTabController;
@@ -256,6 +260,8 @@ public slots:
     void OnRenderRequest();
     void OnTimeoutPumpEvents();
     void OnNetworkReply( QNetworkReply* reply );
+    void onSettingsFileChanged( const QString& path );
+    void onSettingsReloadTimeout();
 
     void showKeyboard( QString existingText, unsigned long userValue = 0 );
     void setKeyboardPos();

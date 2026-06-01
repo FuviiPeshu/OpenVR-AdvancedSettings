@@ -16,6 +16,7 @@ enum class BoolSetting
     PLAYSPACE_moveShortcutRight,
     PLAYSPACE_dragBounds,
     PLAYSPACE_allowExternalEdits,
+    PLAYSPACE_gravityActive,
     PLAYSPACE_oldStyleMotion,
     PLAYSPACE_universeCenteredRotation,
     PLAYSPACE_enableSeatedMotion,
@@ -77,6 +78,9 @@ enum class DoubleSetting
     PLAYSPACE_gravityStrength,
     PLAYSPACE_flingStrength,
     PLAYSPACE_dragMult,
+    PLAYSPACE_targetOffsetX,
+    PLAYSPACE_targetOffsetY,
+    PLAYSPACE_targetOffsetZ,
 
     APPLICATION_appVolume,
 
@@ -92,6 +96,9 @@ enum class DoubleSetting
     CHAPERONE_showDashboardDistance,
     CHAPERONE_fadeDistanceRemembered,
     CHAPERONE_dimHeight,
+
+    AUDIO_micVolume,
+    AUDIO_mirrorVolume,
 
     ROTATION_activationDistance,
     ROTATION_deactivateDistance,
@@ -113,8 +120,12 @@ enum class StringSetting
 
     APPLICATION_autoApplyChaperoneName,
 
+    AUDIO_preferredOutputDevice,
+    AUDIO_preferredInputDevice,
+    AUDIO_preferredMirrorDevice,
+
     // LAST_ENUMERATOR must always be set to the last value
-    LAST_ENUMERATOR = APPLICATION_autoApplyChaperoneName,
+    LAST_ENUMERATOR = AUDIO_preferredMirrorDevice,
 };
 
 enum class IntSetting
@@ -124,6 +135,7 @@ enum class IntSetting
     PLAYSPACE_dragComfortFactor,
     PLAYSPACE_turnComfortFactor,
     PLAYSPACE_frictionPercent,
+    PLAYSPACE_offsetAction,
 
     APPLICATION_debugState,
     APPLICATION_customTickRateMs,
@@ -157,5 +169,9 @@ void setSetting( const IntSetting setting, const int value );
 
 [[nodiscard]] std::string getSetting( const StringSetting setting );
 void setSetting( const StringSetting setting, const std::string value );
+
+void reloadAllSettings();
+
+std::string getSettingsFilePath();
 
 } // namespace settings

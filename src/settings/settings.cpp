@@ -59,6 +59,17 @@ void setSetting( const StringSetting setting, const std::string value )
     settingController.setSetting( setting, value );
 }
 
+void reloadAllSettings()
+{
+    LOG( INFO ) << "Reloading all settings from disk (external edit).";
+    settingController.reloadAllSettings();
+}
+
+std::string getSettingsFilePath()
+{
+    return settingController.getSettingsFileName();
+}
+
 std::string initializeAndGetSettingsPath()
 {
     // The static object is initialized the first time the function is called.

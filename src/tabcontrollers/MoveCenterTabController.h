@@ -264,7 +264,7 @@ public:
     bool lockYToggle() const;
     bool lockZToggle() const;
     bool showLogMatricesButton() const;
-    // bool allowExternalEdits() const;
+    bool allowExternalEdits() const;
     bool universeCenteredRotation() const;
     bool isInitComplete() const;
     double getHmdYawTotal();
@@ -344,7 +344,7 @@ public slots:
     void setLockY( bool value, bool notify = true );
     void setLockZ( bool value, bool notify = true );
     void setShowLogMatricesButton( bool value, bool notify = true );
-    // void setAllowExternalEdits( bool value, bool notify = true );
+    void setAllowExternalEdits( bool value, bool notify = true );
     void setUniverseCenteredRotation( bool value, bool notify = true );
 
     void shutdown();

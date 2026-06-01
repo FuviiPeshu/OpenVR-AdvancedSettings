@@ -99,6 +99,31 @@ public:
         }
     }
 
+    void reloadValue()
+    {
+        const auto v = getQtSetting( SettingValue::category(),
+                                     SettingValue::qtInfo().settingName );
+        if ( isValidQVariant<Value>( v ) )
+        {
+            if constexpr ( std::is_same<Value, bool>::value )
+            {
+                m_value = v.toBool();
+            }
+            else if constexpr ( std::is_same<Value, double>::value )
+            {
+                m_value = v.toDouble();
+            }
+            else if constexpr ( std::is_same<Value, std::string>::value )
+            {
+                m_value = v.toString().toStdString();
+            }
+            else if constexpr ( std::is_same<Value, int>::value )
+            {
+                m_value = v.toInt();
+            }
+        }
+    }
+
 private:
     const Setting m_setting;
     Value m_value;

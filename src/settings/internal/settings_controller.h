@@ -143,6 +143,28 @@ public:
         }
     }
 
+    void reloadAllSettings()
+    {
+        getQSettings().sync();
+
+        for ( auto& setting : m_boolSettings )
+        {
+            setting.reloadValue();
+        }
+        for ( auto& setting : m_doubleSettings )
+        {
+            setting.reloadValue();
+        }
+        for ( auto& setting : m_stringSettings )
+        {
+            setting.reloadValue();
+        }
+        for ( auto& setting : m_intSettings )
+        {
+            setting.reloadValue();
+        }
+    }
+
     template <typename ReturnType, typename Setting>
     [[nodiscard]] ReturnType getSetting( const Setting setting ) const noexcept
     {
@@ -250,6 +272,10 @@ private:
         BoolSettingValue{ BoolSetting::PLAYSPACE_allowExternalEdits,
                           SettingCategory::Playspace,
                           QtInfo{ "allowExternalEdits" },
+                          true },
+        BoolSettingValue{ BoolSetting::PLAYSPACE_gravityActive,
+                          SettingCategory::Playspace,
+                          QtInfo{ "gravityActive" },
                           false },
         BoolSettingValue{ BoolSetting::PLAYSPACE_oldStyleMotion,
                           SettingCategory::Playspace,
@@ -462,6 +488,18 @@ private:
                             SettingCategory::Playspace,
                             QtInfo{ "dragMult" },
                             1.0 },
+        DoubleSettingValue{ DoubleSetting::PLAYSPACE_targetOffsetX,
+                            SettingCategory::Playspace,
+                            QtInfo{ "targetOffsetX" },
+                            0.0 },
+        DoubleSettingValue{ DoubleSetting::PLAYSPACE_targetOffsetY,
+                            SettingCategory::Playspace,
+                            QtInfo{ "targetOffsetY" },
+                            0.0 },
+        DoubleSettingValue{ DoubleSetting::PLAYSPACE_targetOffsetZ,
+                            SettingCategory::Playspace,
+                            QtInfo{ "targetOffsetZ" },
+                            0.0 },
 
         DoubleSettingValue{ DoubleSetting::APPLICATION_appVolume,
                             SettingCategory::Application,
@@ -521,6 +559,14 @@ private:
                             SettingCategory::Chaperone,
                             QtInfo{ "dimHeight" },
                             0.0 },
+        DoubleSettingValue{ DoubleSetting::AUDIO_micVolume,
+                            SettingCategory::Audio,
+                            QtInfo{ "micVolume" },
+                            1.0 },
+        DoubleSettingValue{ DoubleSetting::AUDIO_mirrorVolume,
+                            SettingCategory::Audio,
+                            QtInfo{ "mirrorVolume" },
+                            1.0 },
         DoubleSettingValue{ DoubleSetting::ROTATION_activationDistance,
                             SettingCategory::Rotation,
                             QtInfo{ "activationDistance" },
@@ -579,6 +625,18 @@ private:
                             SettingCategory::Application,
                             QtInfo{ "autoApplyChaperoneName" },
                             nameDefault },
+        StringSettingValue{ StringSetting::AUDIO_preferredOutputDevice,
+                            SettingCategory::Audio,
+                            QtInfo{ "preferredOutputDevice" },
+                            std::string{} },
+        StringSettingValue{ StringSetting::AUDIO_preferredInputDevice,
+                            SettingCategory::Audio,
+                            QtInfo{ "preferredInputDevice" },
+                            std::string{} },
+        StringSettingValue{ StringSetting::AUDIO_preferredMirrorDevice,
+                            SettingCategory::Audio,
+                            QtInfo{ "preferredMirrorDevice" },
+                            std::string{} },
     };
 
     constexpr static auto intSettingsSize
@@ -603,6 +661,10 @@ private:
         IntSettingValue{ IntSetting::PLAYSPACE_frictionPercent,
                          SettingCategory::Playspace,
                          QtInfo{ "frictionPercent" },
+                         0 },
+        IntSettingValue{ IntSetting::PLAYSPACE_offsetAction,
+                         SettingCategory::Playspace,
+                         QtInfo{ "offsetAction" },
                          0 },
 
         IntSettingValue{ IntSetting::APPLICATION_debugState,

@@ -161,6 +161,29 @@ OverlayController::OverlayController( bool desktopMode,
     m_videoTabController.initStage1();
     m_rotationTabController.initStage1();
 
+    // Set up file system watcher for external INI edits
+    {
+        QString settingsPath
+            = QString::fromStdString( settings::getSettingsFilePath() );
+        m_settingsFileWatcher = new QFileSystemWatcher( this );
+        m_settingsFileWatcher->addPath( settingsPath );
+        connect( m_settingsFileWatcher,
+                 &QFileSystemWatcher::fileChanged,
+                 this,
+                 &OverlayController::onSettingsFileChanged );
+
+        m_settingsReloadTimer = new QTimer( this );
+        m_settingsReloadTimer->setSingleShot( true );
+        m_settingsReloadTimer->setInterval( 250 );
+        connect( m_settingsReloadTimer,
+                 &QTimer::timeout,
+                 this,
+                 &OverlayController::onSettingsReloadTimeout );
+
+        LOG( INFO ) << "Settings file watcher active: "
+                    << settingsPath.toStdString();
+    }
+
     // init action handles
 
     m_chaperoneTabController.setLeftHapticActionHandle(
@@ -1714,6 +1737,336 @@ void OverlayController::OnNetworkReply( QNetworkReply* reply )
                      << reply->error();
     }
     reply->deleteLater();
+}
+
+void OverlayController::onSettingsFileChanged( const QString& path )
+{
+    if ( !settings::getSetting(
+             settings::BoolSetting::PLAYSPACE_allowExternalEdits ) )
+    {
+        return;
+    }
+
+    m_settingsReloadTimer->start();
+    if ( !m_settingsFileWatcher->files().contains( path ) )
+    {
+        m_settingsFileWatcher->addPath( path );
+    }
+}
+
+void OverlayController::onSettingsReloadTimeout()
+{
+    // Capture current state before reload
+    bool wasBrightnessEnabled = m_videoTabController.brightnessEnabled();
+    float oldBrightnessOpacity = m_videoTabController.brightnessOpacityValue();
+    bool wasChaperoneDisabled = m_chaperoneTabController.disableChaperone();
+    bool wasGravityActive = m_moveCenterTabController.gravityActive();
+    bool wasColorOverlayEnabled = m_videoTabController.colorOverlayEnabled();
+    bool wasOverlayMethodActive = m_videoTabController.isOverlayMethodActive();
+    float oldColorOpacity = m_videoTabController.colorOverlayOpacity();
+    float oldColorRed = m_videoTabController.colorRed();
+    float oldColorGreen = m_videoTabController.colorGreen();
+    float oldColorBlue = m_videoTabController.colorBlue();
+    bool wasAlarmSoundEnabled
+        = m_chaperoneTabController.isChaperoneAlarmSoundEnabled();
+    bool wasCenterMarkerNew = m_chaperoneTabController.centerMarkerNew();
+    bool wasHapticFeedbackEnabled
+        = m_chaperoneTabController.isChaperoneHapticFeedbackEnabled();
+    bool wasShowDashboardEnabled
+        = m_chaperoneTabController.isChaperoneShowDashboardEnabled();
+    bool wasSwitchToBeginnerEnabled
+        = m_chaperoneTabController.isChaperoneSwitchToBeginnerEnabled();
+    int oldOffsetAction
+        = settings::getSetting( settings::IntSetting::PLAYSPACE_offsetAction );
+    std::string oldOutputDevice = settings::getSetting(
+        settings::StringSetting::AUDIO_preferredOutputDevice );
+    std::string oldInputDevice = settings::getSetting(
+        settings::StringSetting::AUDIO_preferredInputDevice );
+    std::string oldMirrorDevice = settings::getSetting(
+        settings::StringSetting::AUDIO_preferredMirrorDevice );
+    float oldMicVolume = static_cast<float>(
+        settings::getSetting( settings::DoubleSetting::AUDIO_micVolume ) );
+    float oldMirrorVolume = static_cast<float>(
+        settings::getSetting( settings::DoubleSetting::AUDIO_mirrorVolume ) );
+
+    settings::reloadAllSettings();
+
+    // Re-apply gravity active state if changed
+    bool nowGravityActive = settings::getSetting(
+        settings::BoolSetting::PLAYSPACE_gravityActive );
+    if ( nowGravityActive != wasGravityActive )
+    {
+        m_moveCenterTabController.setGravityActive( nowGravityActive, true );
+    }
+
+    // Re-apply brightness if changed
+    bool nowBrightnessEnabled = m_videoTabController.brightnessEnabled();
+    float nowBrightnessOpacity = m_videoTabController.brightnessOpacityValue();
+    if ( nowBrightnessEnabled != wasBrightnessEnabled )
+    {
+        m_videoTabController.setBrightnessEnabled(
+            nowBrightnessEnabled, true, true );
+    }
+    else if ( nowBrightnessEnabled
+              && nowBrightnessOpacity != oldBrightnessOpacity )
+    {
+        m_videoTabController.setBrightnessOpacityValue( nowBrightnessOpacity,
+                                                        true );
+    }
+
+    // Re-apply overlay method if changed
+    bool nowOverlayMethodActive = m_videoTabController.isOverlayMethodActive();
+    if ( nowOverlayMethodActive != wasOverlayMethodActive )
+    {
+        settings::setSetting(
+            settings::BoolSetting::VIDEO_isOverlayMethodActive,
+            wasOverlayMethodActive );
+        settings::setSetting( settings::BoolSetting::VIDEO_colorOverlayEnabled,
+                              wasColorOverlayEnabled );
+        m_videoTabController.setIsOverlayMethodActive( nowOverlayMethodActive,
+                                                       true );
+    }
+
+    // Re-apply color overlay if changed
+    bool nowColorOverlayEnabled = m_videoTabController.colorOverlayEnabled();
+    if ( nowColorOverlayEnabled != wasColorOverlayEnabled )
+    {
+        settings::setSetting( settings::BoolSetting::VIDEO_colorOverlayEnabled,
+                              wasColorOverlayEnabled );
+        m_videoTabController.setColorOverlayEnabled( nowColorOverlayEnabled,
+                                                     true );
+    }
+
+    // Re-apply color overlay opacity if changed
+    float nowColorOpacity = m_videoTabController.colorOverlayOpacity();
+    if ( fabs( static_cast<double>( nowColorOpacity - oldColorOpacity ) )
+         > 0.005 )
+    {
+        settings::setSetting(
+            settings::DoubleSetting::VIDEO_colorOverlayOpacity,
+            static_cast<double>( oldColorOpacity ) );
+        m_videoTabController.setColorOverlayOpacity( nowColorOpacity, true );
+    }
+
+    // Re-apply color overlay RGB values if changed
+    float nowRed = m_videoTabController.colorRed();
+    float nowGreen = m_videoTabController.colorGreen();
+    float nowBlue = m_videoTabController.colorBlue();
+    if ( fabs( static_cast<double>( nowRed - oldColorRed ) ) > 0.005 )
+    {
+        m_videoTabController.setColorRed( nowRed, true, true );
+    }
+    if ( fabs( static_cast<double>( nowGreen - oldColorGreen ) ) > 0.005 )
+    {
+        m_videoTabController.setColorGreen( nowGreen, true, true );
+    }
+    if ( fabs( static_cast<double>( nowBlue - oldColorBlue ) ) > 0.005 )
+    {
+        m_videoTabController.setColorBlue( nowBlue, true, true );
+    }
+
+    // Re-apply chaperone if changed
+    bool nowChaperoneDisabled = m_chaperoneTabController.disableChaperone();
+    if ( nowChaperoneDisabled != wasChaperoneDisabled )
+    {
+        settings::setSetting( settings::BoolSetting::CHAPERONE_disableChaperone,
+                              wasChaperoneDisabled );
+        m_chaperoneTabController.setDisableChaperone( nowChaperoneDisabled,
+                                                      true );
+    }
+
+    // Re-apply alarm sound enable/disable if changed
+    bool nowAlarmEnabled
+        = m_chaperoneTabController.isChaperoneAlarmSoundEnabled();
+    if ( nowAlarmEnabled != wasAlarmSoundEnabled )
+    {
+        settings::setSetting(
+            settings::BoolSetting::CHAPERONE_chaperoneAlarmSoundEnabled,
+            wasAlarmSoundEnabled );
+        m_chaperoneTabController.setChaperoneAlarmSoundEnabled( nowAlarmEnabled,
+                                                                true );
+    }
+
+    // Re-apply center marker if changed
+    bool nowCenterMarkerNew = m_chaperoneTabController.centerMarkerNew();
+    if ( nowCenterMarkerNew != wasCenterMarkerNew )
+    {
+        m_chaperoneTabController.setCenterMarkerNew( nowCenterMarkerNew, true );
+    }
+
+    // Apply preferred audio output device if changed
+    std::string nowOutputDevice = settings::getSetting(
+        settings::StringSetting::AUDIO_preferredOutputDevice );
+    if ( !nowOutputDevice.empty() && nowOutputDevice != oldOutputDevice )
+    {
+        int count = m_audioTabController.getPlaybackDeviceCount();
+        for ( int i = 0; i < count; ++i )
+        {
+            std::string devName
+                = m_audioTabController.getPlaybackDeviceName( i ).toStdString();
+            if ( devName.find( nowOutputDevice ) != std::string::npos )
+            {
+                m_audioTabController.setPlaybackDeviceIndex( i, true );
+                LOG( INFO ) << "Audio output set to: " << devName;
+                break;
+            }
+        }
+    }
+
+    // Apply preferred audio input device if changed
+    std::string nowInputDevice = settings::getSetting(
+        settings::StringSetting::AUDIO_preferredInputDevice );
+    if ( !nowInputDevice.empty() && nowInputDevice != oldInputDevice )
+    {
+        int count = m_audioTabController.getRecordingDeviceCount();
+        for ( int i = 0; i < count; ++i )
+        {
+            std::string devName
+                = m_audioTabController.getRecordingDeviceName( i )
+                      .toStdString();
+            if ( devName.find( nowInputDevice ) != std::string::npos )
+            {
+                m_audioTabController.setMicDeviceIndex( i, true );
+                LOG( INFO ) << "Audio input set to: " << devName;
+                break;
+            }
+        }
+    }
+
+    // Process offset action commands if changed
+    int nowOffsetAction
+        = settings::getSetting( settings::IntSetting::PLAYSPACE_offsetAction );
+    if ( nowOffsetAction != 0 && nowOffsetAction != oldOffsetAction )
+    {
+        if ( nowOffsetAction == 1 )
+        {
+            m_moveCenterTabController.setOffsetX(
+                static_cast<float>( settings::getSetting(
+                    settings::DoubleSetting::PLAYSPACE_targetOffsetX ) ),
+                true );
+            m_moveCenterTabController.setOffsetY(
+                static_cast<float>( settings::getSetting(
+                    settings::DoubleSetting::PLAYSPACE_targetOffsetY ) ),
+                true );
+            m_moveCenterTabController.setOffsetZ(
+                static_cast<float>( settings::getSetting(
+                    settings::DoubleSetting::PLAYSPACE_targetOffsetZ ) ),
+                true );
+        }
+        else if ( nowOffsetAction == 2 )
+        {
+            m_moveCenterTabController.setOffsetX( 0.0f, true );
+            m_moveCenterTabController.setOffsetY( 0.0f, true );
+            m_moveCenterTabController.setOffsetZ( 0.0f, true );
+        }
+        else if ( nowOffsetAction == 3 )
+        {
+            // Fix floor: zero Y offset only
+            m_moveCenterTabController.setOffsetY( 0.0f, true );
+        }
+        settings::setSetting( settings::IntSetting::PLAYSPACE_offsetAction, 0 );
+    }
+
+    m_moveCenterTabController.setGravityStrength(
+        m_moveCenterTabController.gravityStrength(), true );
+    m_moveCenterTabController.setFlingStrength(
+        m_moveCenterTabController.flingStrength(), true );
+    m_moveCenterTabController.setFrictionPercent(
+        m_moveCenterTabController.frictionPercent(), true );
+    m_moveCenterTabController.setMomentumSave(
+        m_moveCenterTabController.momentumSave(), true );
+    m_moveCenterTabController.setDragMult( m_moveCenterTabController.dragMult(),
+                                           true );
+    m_moveCenterTabController.setLockX( m_moveCenterTabController.lockXToggle(),
+                                        true );
+    m_moveCenterTabController.setLockY( m_moveCenterTabController.lockYToggle(),
+                                        true );
+    m_moveCenterTabController.setLockZ( m_moveCenterTabController.lockZToggle(),
+                                        true );
+    m_moveCenterTabController.setMoveShortcutRight(
+        m_moveCenterTabController.moveShortcutRight(), true );
+    m_moveCenterTabController.setMoveShortcutLeft(
+        m_moveCenterTabController.moveShortcutLeft(), true );
+    m_moveCenterTabController.setTurnBindLeft(
+        m_moveCenterTabController.turnBindLeft(), true );
+    m_moveCenterTabController.setTurnBindRight(
+        m_moveCenterTabController.turnBindRight(), true );
+
+    // Guarded chaperone setters
+    bool nowHapticFeedbackEnabled
+        = m_chaperoneTabController.isChaperoneHapticFeedbackEnabled();
+    if ( nowHapticFeedbackEnabled != wasHapticFeedbackEnabled )
+    {
+        settings::setSetting(
+            settings::BoolSetting::CHAPERONE_chaperoneHapticFeedbackEnabled,
+            wasHapticFeedbackEnabled );
+        m_chaperoneTabController.setChaperoneHapticFeedbackEnabled(
+            nowHapticFeedbackEnabled, true );
+    }
+
+    bool nowShowDashboardEnabled
+        = m_chaperoneTabController.isChaperoneShowDashboardEnabled();
+    if ( nowShowDashboardEnabled != wasShowDashboardEnabled )
+    {
+        settings::setSetting(
+            settings::BoolSetting::CHAPERONE_chaperoneShowDashboardEnabled,
+            wasShowDashboardEnabled );
+        m_chaperoneTabController.setChaperoneShowDashboardEnabled(
+            nowShowDashboardEnabled, true );
+    }
+
+    bool nowSwitchToBeginnerEnabled
+        = m_chaperoneTabController.isChaperoneSwitchToBeginnerEnabled();
+    if ( nowSwitchToBeginnerEnabled != wasSwitchToBeginnerEnabled )
+    {
+        settings::setSetting(
+            settings::BoolSetting::CHAPERONE_chaperoneSwitchToBeginnerEnabled,
+            wasSwitchToBeginnerEnabled );
+        m_chaperoneTabController.setChaperoneSwitchToBeginnerEnabled(
+            nowSwitchToBeginnerEnabled, true );
+    }
+
+    // Apply preferred mirror device if changed
+    std::string nowMirrorDevice = settings::getSetting(
+        settings::StringSetting::AUDIO_preferredMirrorDevice );
+    if ( !nowMirrorDevice.empty() && nowMirrorDevice != oldMirrorDevice )
+    {
+        int count = m_audioTabController.getPlaybackDeviceCount();
+        for ( int i = 0; i < count; ++i )
+        {
+            std::string devName
+                = m_audioTabController.getPlaybackDeviceName( i ).toStdString();
+            if ( devName.find( nowMirrorDevice ) != std::string::npos )
+            {
+                m_audioTabController.setMirrorDeviceIndex( i, true );
+                LOG( INFO ) << "Audio mirror set to: " << devName;
+                break;
+            }
+        }
+    }
+
+    // Apply mic volume if changed
+    float nowMicVolume = static_cast<float>(
+        settings::getSetting( settings::DoubleSetting::AUDIO_micVolume ) );
+    if ( nowMicVolume >= 0.0f
+         && fabs( static_cast<double>( nowMicVolume - oldMicVolume ) ) > 0.005 )
+    {
+        m_audioTabController.setMicVolume( nowMicVolume, true );
+        LOG( INFO ) << "Mic volume set to: " << nowMicVolume;
+    }
+
+    // Apply mirror volume if changed
+    float nowMirrorVolume = static_cast<float>(
+        settings::getSetting( settings::DoubleSetting::AUDIO_mirrorVolume ) );
+    if ( nowMirrorVolume >= 0.0f
+         && fabs( static_cast<double>( nowMirrorVolume - oldMirrorVolume ) )
+                > 0.005 )
+    {
+        m_audioTabController.setMirrorVolume( nowMirrorVolume, true );
+        LOG( INFO ) << "Mirror volume set to: " << nowMirrorVolume;
+    }
+
+    LOG( INFO ) << "Settings reloaded from disk (external edit).";
 }
 
 } // namespace advsettings

@@ -41,6 +41,13 @@ void MoveCenterTabController::initStage1()
     reloadOffsetProfiles();
     m_lastDragUpdateTimePoint = std::chrono::steady_clock::now();
     m_lastGravityUpdateTimePoint = std::chrono::steady_clock::now();
+
+    // Restore gravity active state from persisted setting
+    if ( settings::getSetting(
+             settings::BoolSetting::PLAYSPACE_gravityActive ) )
+    {
+        setGravityActive( true, false );
+    }
 }
 
 void MoveCenterTabController::initStage2( OverlayController* var_parent )
@@ -759,6 +766,8 @@ void MoveCenterTabController::setGravityActive( bool value, bool notify )
         m_lastGravityUpdateTimePoint = std::chrono::steady_clock::now();
     }
     m_gravityActive = value;
+    settings::setSetting( settings::BoolSetting::PLAYSPACE_gravityActive,
+                          value );
     if ( notify )
     {
         emit gravityActiveChanged( m_gravityActive );
@@ -840,6 +849,20 @@ void MoveCenterTabController::setShowLogMatricesButton( bool value,
     {
         emit showLogMatricesButtonChanged( value );
     }
+}
+
+bool MoveCenterTabController::allowExternalEdits() const
+{
+    return settings::getSetting(
+        settings::BoolSetting::PLAYSPACE_allowExternalEdits );
+}
+
+void MoveCenterTabController::setAllowExternalEdits( bool value, bool notify )
+{
+    settings::setSetting( settings::BoolSetting::PLAYSPACE_allowExternalEdits,
+                          value );
+    // No signal emitted - this setting has no QML binding
+    Q_UNUSED( notify );
 }
 
 bool MoveCenterTabController::universeCenteredRotation() const
